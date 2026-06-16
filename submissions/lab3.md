@@ -32,58 +32,18 @@ app-payments-1 up       http://payments:8082/metrics
 #### Custom metrics list
 ```
 ┌──(shersh㉿kali)-[~/SRE-Intro/app]
-└─$ curl -s http://localhost:3080/metrics | grep -E "^gateway_" | head -10
-                                                                                                                                              
-┌──(shersh㉿kali)-[~/SRE-Intro/app]
-└─$ curl -s http://localhost:3080/metrics                                 
-# HELP python_gc_objects_collected_total Objects collected during gc
-# TYPE python_gc_objects_collected_total counter
-python_gc_objects_collected_total{generation="0"} 609.0
-python_gc_objects_collected_total{generation="1"} 0.0
-python_gc_objects_collected_total{generation="2"} 0.0
-# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
-# TYPE python_gc_objects_uncollectable_total counter
-python_gc_objects_uncollectable_total{generation="0"} 0.0
-python_gc_objects_uncollectable_total{generation="1"} 0.0
-python_gc_objects_uncollectable_total{generation="2"} 0.0
-# HELP python_gc_collections_total Number of times this generation was collected
-# TYPE python_gc_collections_total counter
-python_gc_collections_total{generation="0"} 45.0
-python_gc_collections_total{generation="1"} 4.0
-python_gc_collections_total{generation="2"} 0.0
-# HELP python_info Python platform information
-# TYPE python_info gauge
-python_info{implementation="CPython",major="3",minor="13",patchlevel="14",version="3.13.14"} 1.0
-# HELP process_virtual_memory_bytes Virtual memory size in bytes.
-# TYPE process_virtual_memory_bytes gauge
-process_virtual_memory_bytes 6.313984e+07
-# HELP process_resident_memory_bytes Resident memory size in bytes.
-# TYPE process_resident_memory_bytes gauge
-process_resident_memory_bytes 5.431296e+07
-# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
-# TYPE process_start_time_seconds gauge
-process_start_time_seconds 1.78159709066e+09
-# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
-# TYPE process_cpu_seconds_total counter
-process_cpu_seconds_total 4.44
-# HELP process_open_fds Number of open file descriptors.
-# TYPE process_open_fds gauge
-process_open_fds 10.0
-# HELP process_max_fds Maximum number of open file descriptors.
-# TYPE process_max_fds gauge
-process_max_fds 2.147483584e+09
-# HELP gateway_requests_total Total requests
-# TYPE gateway_requests_total counter
-# HELP gateway_request_duration_seconds Request duration
-# TYPE gateway_request_duration_seconds histogram
-# HELP gateway_retry_total Retry attempts
-# TYPE gateway_retry_total counter
-# HELP gateway_circuit_breaker_transitions_total Circuit breaker state changes
-# TYPE gateway_circuit_breaker_transitions_total counter
-# HELP gateway_rate_limit_rejections_total Requests rejected by rate limiter
-# TYPE gateway_rate_limit_rejections_total counter
+└─$ curl -s http://localhost:9090/api/v1/label/__name__/values | python3 -c "
+import sys, json
+for n in json.load(sys.stdin)['data']:
+    if any(x in n for x in ['gateway_', 'events_', 'payments_']):
+        print(n)
+"
+events_db_pool_size
+events_orders_created
+events_orders_total
+events_reservations_active
+prometheus_sd_kubernetes_events_total
 ```
-idk what went wrong...
 
 #### PromQL query output (request rate)
 ```
@@ -198,18 +158,29 @@ The Error Rate golden signal showed the failure first. The increase became visib
 
 ### Task 2 — Define SLOs & Recording Rules
 #### SLI/SLO definitions with error budget math
+SLI 1 (Availability): Percentage of gateway requests that do not return 5xx errors.\
+SLO 1: 99.5% availability measured over a rolling 7-day window.\
+SLI 2 (Latency): Percentage of gateway requests completed in less than 500 ms.\
+SLO 2: 95% of requests should complete within 500 ms.\
 
+Error budget math:\
+With approximately 1000 requests per day, the system receives about 7000 requests per week.\
+For an availability SLO of 99.5%, the error budget is 0.5% of requests.\
+7000 × 0.005 = 35\
+Thus, the error budget allows up to 35 failed requests per week.
 
 #### Rules loaded output
-
+```
+gateway:sli_availability:ratio_rate5m        = ok
+gateway:sli_latency_500ms:ratio_rate5m       = ok
+gateway:error_budget_burn_rate:ratio_rate5m  = ok
+```
+Recorded metrics:
+```
+gateway:sli_availability:ratio_rate5m = 0.9191919191919192
+gateway:sli_latency_500ms:ratio_rate5m = 1
+gateway:error_budget_burn_rate:ratio_rate5m = 16.16161616161614
+```
 
 #### SLO gauge observation during failure
-
-### Bonus Task — Correlate Failure Across Metrics & Logs
-#### Timeline with timestamps: injection → first error in logs → spike on dashboard → recovery
-
-
-#### Log excerpts from gateway and payments at the failure moment
-
-
-#### Root cause explanation connecting metrics to logs
+During the failure experiment, the SLO gauge dropped from ~100% to about 91.92% when the payments service was stopped. This fell well below the 99.5% SLO threshold, clearly indicating an availability violation, and the burn rate spiked to roughly 16.16, showing fast error budget consumption.
