@@ -3,9 +3,10 @@
 
 ### Task 1 — CI Pipeline + ArgoCD Setup
 #### Link to your GitHub Actions run (green check)
-https://github.com/shersh-is/SRE-Intro/actions/runs/27945247999\
-https://github.com/shersh-is/SRE-Intro/actions/runs/27948739563\
-https://github.com/shersh-is/SRE-Intro/actions/runs/27949527247
+https://github.com/shersh-is/SRE-Intro/actions/runs/27945247999 \
+https://github.com/shersh-is/SRE-Intro/actions/runs/27948739563 \
+https://github.com/shersh-is/SRE-Intro/actions/runs/27949527247 \
+etc...
 
 #### Output of gh api user/packages?package_type=container showing pushed images
 ```
@@ -58,7 +59,7 @@ If someone manually runs kubectl edit on a resource managed by ArgoCD, the chang
 
 ### Task 2 — Rollback via GitOps
 #### argocd app get showing Degraded after bad deploy
-``
+```
 ┌──(shersh㉿kali)-[~/SRE-Intro]
 └─$ argocd app get quickticket
 Name:               argocd/quickticket
