@@ -59,7 +59,7 @@ If someone manually runs kubectl edit on a resource managed by ArgoCD, the chang
 
 ### Task 2 — Rollback via GitOps
 #### argocd app get showing Degraded after bad deploy
-``
+```
 ┌──(shersh㉿kali)-[~/SRE-Intro]
 └─$ argocd app get quickticket
 Name:               argocd/quickticket
