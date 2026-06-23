@@ -9,6 +9,7 @@ sum(rate(gateway_requests_total{status=~"5.."}[5m])) / sum(rate(gateway_requests
 #### Contact point type and evidence of notification received (webhook URL output or screenshot)
 Contact-point type: Grafana-managed \
 Evidence of notification received: \
+![image](https://github.com/shersh-is/SRE-Intro/blob/feature/lab6/submissions/notif-evidence.png)
 
 #### Your runbook (full text)
 # Runbook: QuickTicket High Error Rate
@@ -198,7 +199,8 @@ Related services:
 * Grafana
 
 #### Alert firing evidence: Grafana alert rule status showing "Firing"
-
+![image](https://github.com/shersh-is/SRE-Intro/blob/feature/lab6/submissions/firing-1.png)
+![image](https://github.com/shersh-is/SRE-Intro/blob/feature/lab6/submissions/firing-2.jpg)
 
 #### Timeline: when you injected → when alert fired → when you diagnosed → when you fixed → when alert resolved
 | Event                          | Time     |
@@ -211,6 +213,8 @@ Related services:
 | Fix applied                    | 13:33    |
 | Alert resolved                 | 13:35    |
 
+![image](https://github.com/shersh-is/SRE-Intro/blob/feature/lab6/submissions/resolved-1.png)
+![image](https://github.com/shersh-is/SRE-Intro/blob/feature/lab6/submissions/resolved-2.png)
 
 #### Answer: "How long from failure injection to alert firing? Why the delay?"
 It took approximately 3 minutes from failure injection to alert firing. \
