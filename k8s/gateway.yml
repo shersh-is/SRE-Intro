@@ -30,7 +30,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: gateway
-          image: gateway:19bf938567b44de1dfb4bf45b29ef1430579c944
+          image: ghcr.io/shersh-is/quickticket-gateway:19bf938567b44de1dfb4bf45b29ef1430579c944
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

@@ -1,6 +1,5 @@
 # Lab 7 — Progressive Delivery: Canary Deployments
 ## Proof of work by Viktoriya Yurina B24-CBS-01
-
 ### Task 1 — Manual Canary Deployment
 #### Output of kubectl argo rollouts version
 ```
