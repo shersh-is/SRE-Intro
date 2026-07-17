@@ -26,8 +26,16 @@ spec:
         version: "v3"
         app: gateway
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway     # don't block scheduling on single-node
+          labelSelector:
+            matchLabels:
+              app: gateway
       imagePullSecrets:
         - name: ghcr-secret
+      terminationGracePeriodSeconds: 40
       containers:
         - name: gateway
           image: ghcr.io/shersh-is/quickticket-gateway:4ee0c84e759a7092ded504285b556cbed8275dd2
@@ -44,6 +52,22 @@ spec:
             - name: NOTIFICATIONS_URL
               value: "http://notifications:8083"
 
+          lifecycle:
+            # Sleep BEFORE SIGTERM reaches the app. Gives kube-proxy / endpoints
+            # controllers time to propagate this pod's NotReady state to every
+            # node's iptables, so new traffic stops routing here BEFORE uvicorn
+            # shuts down. Without this, there's a ~5-10s window where SIGTERM
+            # + incoming traffic overlap and requests get RST.
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"]
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 2
+            failureThreshold: 1
+
           resources:
             requests:
               cpu: 50m
@@ -59,13 +83,6 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             failureThreshold: 3
-
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            periodSeconds: 5
-            failureThreshold: 2
 ---
 apiVersion: v1
 kind: Service
