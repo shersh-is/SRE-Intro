@@ -1,4 +1,34 @@
-"""QuickTicket Gateway — API router and entry point.
+"""QuickTicket Gateway — AP"""QuickTicket Gateway — API router and entry point.
+
+Lab 11 scaffold. The wiring (middleware, /pay handler composition, helper
+functions, Prometheus metrics) is in place. The three resilience-pattern
+classes/functions have empty no-op bodies marked `# TODO (Lab 11): ...`.
+
+Default behavior (no patterns implemented):
+  - call_with_retry: calls func once, no retry
+  - CircuitBreaker.call:  calls func, never trips
+  - RateLimiter.allow:    always returns True
+
+So labs 1-10 run unchanged. Lab 11 students replace the TODOs with real
+implementations and the patterns light up.
+"""
+
+import asyncio
+import os
+import random
+import re
+import time
+import logging
+from collections import defaultdict, deque
+
+import httpx
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+# --- Config ---
+EVENTS_URL = os.getenv("EVENTS_URL", "http://events:8081")
+PAYMENTS_URL = os.getenv("PAYMENTS_URL",I router and entry point.
 
 Lab 11 scaffold. The wiring (middleware, /pay handler composition, helper
 functions, Prometheus metrics) is in place. The three resilience-pattern
@@ -90,7 +120,7 @@ def _normalize_path(path: str) -> str:
 # gateway behaves identically to lab 10 if you don't change them. In lab 11,
 # you replace the `# TODO (Lab 11): ...` blocks with real implementations.
 
-async def call_with_retry(func, target: str, max_retries: int=RETRY_MAX):
+async def call_with_retry(func, target: str, max_retries: int = RETRY_MAX):
     last_exception = None
     base_delay = RETRY_BASE_DELAY_MS / 1000.0
 
@@ -183,33 +213,7 @@ class CircuitBreaker:
         No-op default: just calls func. Lab 11 task 11.7 replaces this with
         the state machine. Raise `CircuitOpenError` when the circuit is open.
         """
-
-        # Fast-fail if the circuit is OPEN
-    if self.state == "OPEN":
-            if time.time() - self.opened_at >= self.cooldown:
-                self._transition("HALF_OPEN")
-            else:
-                raise CircuitOpenError(f"circuit[{self.name}] OPEN")
-
-        try:
-            result = await func()
-
-            # Success: close the circuit and reset failures
-            self.failures = 0
-            self._transition("CLOSED")
-            return result
-
-        except Exception:
-            self.failures += 1
-            self.opened_at = time.time()
-
-            # Open immediately if HALF_OPEN fails,
-            # or if failure threshold is reached in CLOSED
-            if self.state == "HALF_OPEN" or self.failures >= self.threshold:
-                self._transition("OPEN")
-
-            raise
-
+        # TODO (Lab 11): implement CLOSED/OPEN/HALF_OPEN state machine here.
         return await func()
 
 
@@ -231,20 +235,7 @@ class RateLimiter:
 
         No-op default: always True. Lab 11 task 11.8 replaces this body.
         """
-        now = time.time()
-        q = self.hits[key]
-        cutoff = now - self.window_s
-
-        # Remove timestamps outside the sliding window
-        while q and q[0] < cutoff:
-            q.popleft()
-
-        # Reject if the request rate exceeds the limit
-        if len(q) >= self.rps:
-            return False
-
-        # Record the current request
-        q.append(now)
+        # TODO (Lab 11): implement sliding-window check here.
         return True
 
 
