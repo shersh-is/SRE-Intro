@@ -41,6 +41,8 @@ spec:
               value: "http://payments:8082"
             - name: GATEWAY_TIMEOUT_MS
               value: "5000"
+            - name: NOTIFICATIONS_URL
+              value: "http://notifications:8083"
 
           resources:
             requests:

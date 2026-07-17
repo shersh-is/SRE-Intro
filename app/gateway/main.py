@@ -90,19 +90,58 @@ def _normalize_path(path: str) -> str:
 # gateway behaves identically to lab 10 if you don't change them. In lab 11,
 # you replace the `# TODO (Lab 11): ...` blocks with real implementations.
 
+async def call_with_retry(func, target: str, max_retries: int=RETRY_MAX):
+    last_exception = None
+    base_delay = RETRY_BASE_DELAY_MS / 1000.0
 
-async def call_with_retry(func, target: str, max_retries: int = RETRY_MAX):
-    """Call `func` with retry-on-transient-error.
+    for attempt in range(max_retries):
+        try:
+            result = await func()
 
-    No-op default: calls func once and returns. Lab 11 task 11.4 replaces this
-    body with exponential backoff + jitter, retryable/non-retryable branching,
-    and Prometheus counters on the `gateway_retry_total{target,result}` metric.
+            if attempt > 0:
+                RETRY_TOTAL.labels(
+                    target=target,
+                    result="succeeded_after_retry",
+                ).inc()
 
-    See lab 11 §11.4 for the behavior contract. The wiring (in /pay below)
-    will pick up your implementation automatically.
-    """
-    # TODO (Lab 11): implement exponential backoff + jitter here.
-    return await func()
+            return result
+
+        except Exception as exc:
+            last_exception = exc
+
+            retryable = False
+
+            if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError)):
+                retryable = True
+
+            elif isinstance(exc, httpx.HTTPStatusError):
+                status = exc.response.status_code
+
+                if status >= 500 or status in (408, 429):
+                    retryable = True
+                elif 400 <= status < 500:
+                    RETRY_TOTAL.labels(
+                        target=target,
+                        result="non_retryable",
+                    ).inc()
+                    raise
+
+            if attempt == max_retries - 1:
+                RETRY_TOTAL.labels(
+                    target=target,
+                    result="exhausted",
+                ).inc()
+                raise last_exception
+
+            RETRY_TOTAL.labels(
+                target=target,
+                result="retried",
+            ).inc()
+
+            delay = base_delay * (2 ** attempt) + random.uniform(0, base_delay)
+            await asyncio.sleep(delay)
+
+    raise last_exception
 
 
 class CircuitOpenError(Exception):
@@ -144,7 +183,33 @@ class CircuitBreaker:
         No-op default: just calls func. Lab 11 task 11.7 replaces this with
         the state machine. Raise `CircuitOpenError` when the circuit is open.
         """
-        # TODO (Lab 11): implement CLOSED/OPEN/HALF_OPEN state machine here.
+
+	# Fast-fail if the circuit is OPEN
+    	if self.state == "OPEN":
+        	if time.time() - self.opened_at >= self.cooldown:
+            	self._transition("HALF_OPEN")
+        	else:
+            	raise CircuitOpenError(f"circuit[{self.name}] OPEN")
+
+    	try:
+        	result = await func()
+
+        	# Success: close the circuit and reset failures
+        	self.failures = 0
+        	self._transition("CLOSED")
+        	return result
+
+    	except Exception:
+        	self.failures += 1
+        	self.opened_at = time.time()
+
+        	# Open immediately if HALF_OPEN fails,
+        	# or if failure threshold is reached in CLOSED
+        	if self.state == "HALF_OPEN" or self.failures >= self.threshold:
+            	self._transition("OPEN")
+
+        	raise
+
         return await func()
 
 
@@ -166,8 +231,21 @@ class RateLimiter:
 
         No-op default: always True. Lab 11 task 11.8 replaces this body.
         """
-        # TODO (Lab 11): implement sliding-window check here.
-        return True
+        now = time.time()
+    	q = self.hits[key]
+    	cutoff = now - self.window_s
+
+    	# Remove timestamps outside the sliding window
+    	while q and q[0] < cutoff:
+        	q.popleft()
+
+    	# Reject if the request rate exceeds the limit
+    	if len(q) >= self.rps:
+        	return False
+
+    	# Record the current request
+    	q.append(now)
+    	return True
 
 
 payments_cb = CircuitBreaker(CB_FAILURE_THRESHOLD, CB_COOLDOWN_S, name="payments")
